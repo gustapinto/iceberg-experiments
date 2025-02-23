@@ -1,0 +1,55 @@
+services:
+  nessie-catalog:
+    image: "ghcr.io/projectnessie/nessie:0.103.0"
+    ports:
+      - "19120:19120"
+      - "19000:19000"
+    depends_on:
+      - "nessie-catalog-db"
+      - "nessie-storage"
+    network_mode: "host"
+    environment:
+      - quarkus.http.port19120
+      - quarkus.management.port=19000
+      - quarkus.datasource.postgresql.jdbc.url=jdbc:postgresql://localhost:5432/nessie-catalog-db?user=nessie-catalog-db-user&password=nessie-catalog-db-pass
+      - nessie.server.send-stacktrace-to-client=true
+      - nessie.server.authentication.enabled=false
+      - nessie.version.store.type=JDBC
+      - nessie.version.store.persist.jdbc.datasource=postgresql
+      - nessie.catalog.default-warehouse=df-warehouse
+      - nessie.catalog.warehouses.df-warehouse.location=s3://nessie-test-warehouse-1/
+      - nessie.catalog.service.s3.default-options.endpoint=http://localhost:9000/
+      - nessie.catalog.service.s3.default-options.auth-type=STATIC
+      - nessie.catalog.service.s3.default-options.access-key=urn:nessie-secret:quarkus:nessie.catalog.secrets.access-key
+      - nessie.catalog.service.s3.default-options.path-style-access=true
+      - nessie.catalog.service.s3.default-options.region=us-east-1
+      - nessie.catalog.secrets.access-key.name=admin
+      - nessie.catalog.secrets.access-key.secret=password
+
+  nessie-catalog-db:
+    image: "postgres:17-alpine3.21"
+    ports:
+      - "5432:5432"
+    network_mode: "host"
+    environment:
+      POSTGRES_PASSWORD: "nessie-catalog-db-pass"
+      POSTGRES_USER: "nessie-catalog-db-user"
+      POSTGRES_DB: "nessie-catalog-db"
+
+  nessie-storage:
+    image: quay.io/minio/minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    network_mode: "host"
+    environment:
+      MINIO_ROOT_USER: "admin"
+      MINIO_ROOT_PASSWORD: "password"
+      MINIO_REGION: "us-east-1"
+    entrypoint: >
+      /bin/sh -c "
+      minio server /data --console-address ':9001' &
+      sleep 5;
+      mc alias set myminio http://localhost:9000 admin password;
+      mc mb myminio/nessie-test-warehouse-1 --ignore-existing;
+      tail -f /dev/null"
