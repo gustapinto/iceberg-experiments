@@ -53,3 +53,5 @@ services:
       mc alias set myminio http://localhost:9000 admin password;
       mc mb myminio/nessie-test-warehouse-1 --ignore-existing;
       tail -f /dev/null"
+    volumes:
+      - ./data:/data
