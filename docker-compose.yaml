@@ -9,7 +9,8 @@ services:
       - "nessie-storage"
     network_mode: "host"
     environment:
-      - quarkus.http.port19120
+      # DO NOT CHANGE FORMAT -> Using a list to avoid mismatchs on Nessie side
+      - quarkus.http.port=19120
       - quarkus.management.port=19000
       - quarkus.datasource.postgresql.jdbc.url=jdbc:postgresql://localhost:5432/nessie-catalog-db?user=nessie-catalog-db-user&password=nessie-catalog-db-pass
       - nessie.server.send-stacktrace-to-client=true
@@ -55,3 +56,13 @@ services:
       tail -f /dev/null"
     volumes:
       - ./data:/data
+
+  trino:
+    image: "docker.io/trinodb/trino:479"
+    volumes:
+      - "./:/iceberg-experiments"
+    ports:
+      - "8080:8080"
+    network_mode: "host"
+    environment:
+      CATALOG_MANAGEMENT: "dynamic"
