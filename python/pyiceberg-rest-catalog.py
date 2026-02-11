@@ -1,4 +1,5 @@
 from datetime import datetime
+from json import load, dumps
 
 from pyarrow import Table as ArrowTable
 from pyiceberg.catalog import Catalog
@@ -20,50 +21,11 @@ TABLE_SPEC: Schema = Schema(
     ),
     NestedField(field_id=4, name="value", field_type=DoubleType(), required=False),
     NestedField(field_id=5, name="ts", field_type=TimestampType(), required=False),
+    NestedField(field_id=6, name="person", field_type=StringType(), required=False)
 )
 PARTITION_SPEC: PartitionSpec = PartitionSpec(
     PartitionField(source_id=5, field_id=1000, transform=DayTransform(), name="ts_day"),
 )
-SAMPLE_DATA: ArrowTable = ArrowTable.from_pylist(
-    [
-        {
-            "code": "1234567890",
-            "salesperson_code": "1234567890",
-            "product_code": "1234567890",
-            "value": 4.90,
-            "ts": datetime.now(),
-        },
-        {
-            "code": "1234567891",
-            "salesperson_code": "1234567891",
-            "product_code": "1234567891",
-            "value": 1.90,
-            "ts": datetime.now(),
-        },
-        {
-            "code": "1234567892",
-            "salesperson_code": "1234567892",
-            "product_code": "1234567892",
-            "value": 11.90,
-            "ts": datetime.now(),
-        },
-        {
-            "code": "1234567893",
-            "salesperson_code": "1234567893",
-            "product_code": "1234567893",
-            "value": 8.90,
-            "ts": datetime.now(),
-        },
-        {
-            "code": "1234567894",
-            "salesperson_code": "1234567894",
-            "product_code": "1234567894",
-            "value": 7.90,
-            "ts": datetime.now(),
-        },
-    ],
-)
-
 
 def main() -> None:
     # Se conectando a um catálogo Iceberg REST
@@ -91,8 +53,22 @@ def main() -> None:
         identifier="nessie-test-ns-1.sale-products"
     )
 
-    # Inserindo novos dados mantendo os antigos
-    table.append(SAMPLE_DATA)
+    # Populando tabela com dados mockados
+    with open("datasets/sale-products.json") as r:
+        def _dataset_mapper(d):
+            return {
+                **d,
+                "person": dumps(d.get("person")),
+                "ts": datetime.now(),
+            }
+
+        dataset: list[dict] = list(map(_dataset_mapper, load(r)))
+
+        # Montando ArrowTable com base em uma lista
+        arrow_dataset: ArrowTable = ArrowTable.from_pylist(dataset)
+
+        # Sobreescrevendo dados na tabela
+        table.overwrite(arrow_dataset)
 
     # Consultando dados da tabela
     scan: DataScan = table.scan(row_filter="value > 5.0", limit=10)
